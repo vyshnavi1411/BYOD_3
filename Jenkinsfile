@@ -42,7 +42,7 @@ pipeline {
             steps {
                 sh '''
                 echo "[splunk]" > dynamic_inventory.ini
-                echo "${INSTANCE_IP} ansible_user=ec2-user ansible_ssh_private_key_file=/Users/vyshu/.ssh/My_Ecommerce.pem" >> dynamic_inventory.ini
+                echo "${INSTANCE_IP} ansible_user=ec2-user" >> dynamic_inventory.ini
                 '''
             }
         }
@@ -77,23 +77,27 @@ pipeline {
 
         stage('Install Splunk') {
             steps {
-                sh '''
-                ansible-playbook playbooks/splunk.yml \
-                  -i dynamic_inventory.ini \
-                  -u ec2-user \
-                  --ssh-extra-args="-o StrictHostKeyChecking=no"
-                '''
+                sshagent(['My_Ecommerce']) {
+                    sh '''
+                    ansible-playbook playbooks/splunk.yml \
+                      -i dynamic_inventory.ini \
+                      -u ec2-user \
+                      --ssh-extra-args="-o StrictHostKeyChecking=no"
+                    '''
+                }
             }
         }
 
         stage('Verify Splunk') {
             steps {
-                sh '''
-                ansible-playbook playbooks/test-splunk.yml \
-                  -i dynamic_inventory.ini \
-                  -u ec2-user \
-                  --ssh-extra-args="-o StrictHostKeyChecking=no"
-                '''
+                sshagent(['My_Ecommerce']) {
+                    sh '''
+                    ansible-playbook playbooks/test-splunk.yml \
+                      -i dynamic_inventory.ini \
+                      -u ec2-user \
+                      --ssh-extra-args="-o StrictHostKeyChecking=no"
+                    '''
+                }
             }
         }
 
