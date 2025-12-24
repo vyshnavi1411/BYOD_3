@@ -69,6 +69,22 @@ pipeline {
         }
 
         /* =========================
+           Wait for SSH (IMPORTANT)
+           ========================= */
+        stage('Wait for SSH') {
+            steps {
+                sh '''
+                for i in {1..10}; do
+                  nc -z ${INSTANCE_IP} 22 && exit 0
+                  echo "Waiting for SSH to be ready..."
+                  sleep 15
+                done
+                exit 1
+                '''
+            }
+        }
+
+        /* =========================
            Install Splunk
            ========================= */
         stage('Install Splunk') {
@@ -113,13 +129,9 @@ pipeline {
         }
     }
 
-    /* =========================
-       Post Actions (Cleanup)
-       ========================= */
     post {
-    always {
-        sh 'rm -f dynamic_inventory.ini'
+        always {
+            sh 'rm -f dynamic_inventory.ini'
+        }
     }
-}
-
 }
