@@ -1,16 +1,16 @@
 pipeline {
     agent any
 
-   environment {
-    TF_IN_AUTOMATION = 'true'
-    TF_CLI_ARGS      = '-no-color'
+    environment {
+        TF_IN_AUTOMATION = 'true'
+        TF_CLI_ARGS      = '-no-color'
 
-    AWS_CREDS   = credentials('AWS_CREDS')
-    SSH_CRED_ID = 'My_SSH'
+        AWS_CREDS   = credentials('AWS_CREDS')
+        SSH_CRED_ID = 'My_SSH'
 
-    PATH = "/Users/vyshu/Library/Python/3.12/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-}
-
+        // Terraform + AWS CLI + Ansible paths
+        PATH = "/Users/vyshu/Library/Python/3.12/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+    }
 
     stages {
 
@@ -68,32 +68,34 @@ pipeline {
             }
         }
 
-        stage('Test Splunk') {
-    steps {
-        sh '''
-        ansible-playbook playbooks/test-splunk.yml \
-          -i dynamic_inventory.ini \
-          -u ec2-user
-        '''
-    }
-}
-
-
         /* =========================
-           Test Splunk
+           Install Splunk
            ========================= */
-        stage('Test Splunk') {
+        stage('Install Splunk') {
             steps {
-                ansiblePlaybook(
-                    playbook: 'playbooks/test-splunk.yml',
-                    inventory: 'dynamic_inventory.ini',
-                    credentialsId: "${SSH_CRED_ID}"
-                )
+                sh '''
+                ansible-playbook playbooks/splunk.yml \
+                  -i dynamic_inventory.ini \
+                  -u ec2-user
+                '''
             }
         }
 
         /* =========================
-           Manual Destroy Gate
+           Verify Splunk
+           ========================= */
+        stage('Verify Splunk') {
+            steps {
+                sh '''
+                ansible-playbook playbooks/test-splunk.yml \
+                  -i dynamic_inventory.ini \
+                  -u ec2-user
+                '''
+            }
+        }
+
+        /* =========================
+           Manual Destroy Approval
            ========================= */
         stage('Validate Destroy') {
             steps {
@@ -111,6 +113,9 @@ pipeline {
         }
     }
 
+    /* =========================
+       Post Actions (Cleanup)
+       ========================= */
     post {
         always {
             sh 'rm -f dynamic_inventory.ini'
