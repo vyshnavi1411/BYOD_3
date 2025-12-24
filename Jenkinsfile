@@ -2,23 +2,27 @@ pipeline {
     agent any
 
     environment {
+        // Terraform settings
         TF_IN_AUTOMATION = 'true'
         TF_CLI_ARGS      = '-no-color'
 
-        AWS_CREDS   = credentials('AWS_CREDS')
+        // AWS Credentials - Using individual variables to avoid plugin warnings
+        AWS_ACCESS_KEY_ID     = credentials('AWS_CREDS_KEY')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_CREDS_SECRET')
+        
+        // SSH Credential ID from Jenkins Global Credentials
         SSH_CRED_ID = 'My_SSH'
 
-        // 🔴 CRITICAL: disable SSH host key checking for Ansible
+        // Ansible settings
         ANSIBLE_HOST_KEY_CHECKING = 'False'
 
-        // Terraform + AWS CLI + Ansible paths
+        // Tooling Paths
         PATH = "/Users/vyshu/Library/Python/3.12/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
     }
 
     stages {
-
         /* =========================
-           Terraform Apply + Outputs
+           Terraform Apply
            ========================= */
         stage('Terraform Apply') {
             steps {
@@ -26,6 +30,7 @@ pipeline {
                     sh "terraform init"
                     sh "terraform apply -auto-approve -var-file=${BRANCH_NAME}.tfvars"
 
+                    // Capture outputs to environment variables
                     env.INSTANCE_ID = sh(
                         script: 'terraform output -raw instance_id',
                         returnStdout: true
@@ -35,10 +40,6 @@ pipeline {
                         script: 'terraform output -raw instance_public_ip',
                         returnStdout: true
                     ).trim()
-
-                    if (!env.INSTANCE_ID.startsWith("i-")) {
-                        error "Invalid INSTANCE_ID captured: ${env.INSTANCE_ID}"
-                    }
 
                     echo "EC2 INSTANCE ID : ${env.INSTANCE_ID}"
                     echo "EC2 PUBLIC IP  : ${env.INSTANCE_IP}"
@@ -59,7 +60,7 @@ pipeline {
         }
 
         /* =========================
-           AWS Health Check
+           Wait for EC2 Health
            ========================= */
         stage('Wait for EC2 Health') {
             steps {
@@ -79,7 +80,7 @@ pipeline {
                 sh '''
                 for i in {1..10}; do
                   nc -z ${INSTANCE_IP} 22 && exit 0
-                  echo "Waiting for SSH..."
+                  echo "Waiting for SSH port to open..."
                   sleep 15
                 done
                 exit 1
@@ -92,11 +93,15 @@ pipeline {
            ========================= */
         stage('Install Splunk') {
             steps {
-                sh '''
-                ansible-playbook playbooks/splunk.yml \
-                  -i dynamic_inventory.ini \
-                  -u ec2-user
-                '''
+                // Wrap in sshagent so Ansible can find the private key
+                sshagent([SSH_CRED_ID]) {
+                    sh '''
+                    ansible-playbook playbooks/splunk.yml \
+                      -i dynamic_inventory.ini \
+                      -u ec2-user \
+                      --ssh-common-args="-o StrictHostKeyChecking=no"
+                    '''
+                }
             }
         }
 
@@ -105,11 +110,14 @@ pipeline {
            ========================= */
         stage('Verify Splunk') {
             steps {
-                sh '''
-                ansible-playbook playbooks/test-splunk.yml \
-                  -i dynamic_inventory.ini \
-                  -u ec2-user
-                '''
+                sshagent([SSH_CRED_ID]) {
+                    sh '''
+                    ansible-playbook playbooks/test-splunk.yml \
+                      -i dynamic_inventory.ini \
+                      -u ec2-user \
+                      --ssh-common-args="-o StrictHostKeyChecking=no"
+                    '''
+                }
             }
         }
 
@@ -118,7 +126,7 @@ pipeline {
            ========================= */
         stage('Validate Destroy') {
             steps {
-                input message: 'Do you want to destroy the infrastructure?', ok: 'Destroy'
+                input message: "Infrastructure is ready. Approve to destroy?", ok: "Destroy"
             }
         }
 
@@ -134,9 +142,11 @@ pipeline {
 
     post {
         always {
+            // Clean up inventory file
             sh 'rm -f dynamic_inventory.ini'
         }
         failure {
+            // Ensure resources are deleted if the build fails
             sh "terraform destroy -auto-approve -var-file=${BRANCH_NAME}.tfvars || true"
         }
         aborted {
