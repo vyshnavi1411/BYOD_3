@@ -1,5 +1,6 @@
 pipeline {
     agent any
+
     environment {
         TF_IN_AUTOMATION = 'true'
         TF_CLI_ARGS      = '-no-color'
@@ -7,7 +8,9 @@ pipeline {
         SSH_CRED_ID = 'My_SSH'
         PATH = "/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
     }
+
     stages {
+
         stage('Terraform Apply') {
             steps {
                 script {
@@ -28,6 +31,7 @@ pipeline {
                 }
             }
         }
+
         stage('Create Dynamic Inventory') {
             steps {
                 sh '''
@@ -36,6 +40,7 @@ pipeline {
                 '''
             }
         }
+
         stage('Wait for EC2 Health') {
             steps {
                 sh '''
@@ -45,6 +50,7 @@ pipeline {
                 '''
             }
         }
+
         stage('Install Splunk') {
             steps {
                 ansiblePlaybook(
@@ -64,10 +70,10 @@ pipeline {
                 )
             }
         }
+
         stage('Validate Destroy') {
-            input {
-                message "Do you want to destroy the infrastructure?"
-                ok "Destroy"
+            steps {
+                input message: 'Do you want to destroy the infrastructure?', ok: 'Destroy'
             }
         }
 
@@ -77,6 +83,7 @@ pipeline {
             }
         }
     }
+
     post {
         always {
             sh 'rm -f dynamic_inventory.ini'
