@@ -68,18 +68,16 @@ pipeline {
             }
         }
 
-        /* =========================
-           Install Splunk
-           ========================= */
-        stage('Install Splunk') {
-            steps {
-                ansiblePlaybook(
-                    playbook: 'playbooks/splunk.yml',
-                    inventory: 'dynamic_inventory.ini',
-                    credentialsId: "${SSH_CRED_ID}"
-                )
-            }
-        }
+        stage('Test Splunk') {
+    steps {
+        sh '''
+        ansible-playbook playbooks/test-splunk.yml \
+          -i dynamic_inventory.ini \
+          -u ec2-user
+        '''
+    }
+}
+
 
         /* =========================
            Test Splunk
