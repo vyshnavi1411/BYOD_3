@@ -4,49 +4,47 @@ pipeline {
     environment {
         TF_IN_AUTOMATION = 'true'
         TF_CLI_ARGS      = '-no-color'
-        ANSIBLE_HOST_KEY_CHECKING = 'False'
-
-        PATH = "/Users/vyshu/Library/Python/3.12/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
     }
 
     stages {
-
         stage('Terraform Apply') {
             steps {
                 withCredentials([
                     [$class: 'AmazonWebServicesCredentialsBinding',
                      credentialsId: 'AWS_CREDS']
                 ]) {
-                    script {
-                        sh "terraform init"
-                        sh "terraform apply -auto-approve -var-file=${BRANCH_NAME}.tfvars"
+                    sh 'terraform init'
+                    sh "terraform apply -auto-approve -var-file=${BRANCH_NAME}.tfvars"
 
-                        env.INSTANCE_ID = sh(
+                    script {
+                        INSTANCE_ID = sh(
                             script: 'terraform output -raw instance_id',
                             returnStdout: true
                         ).trim()
 
-                        env.INSTANCE_IP = sh(
+                        INSTANCE_IP = sh(
                             script: 'terraform output -raw instance_public_ip',
                             returnStdout: true
                         ).trim()
 
-                        echo "EC2 INSTANCE ID : ${env.INSTANCE_ID}"
-                        echo "EC2 PUBLIC IP  : ${env.INSTANCE_IP}"
+                        echo "INSTANCE ID: ${INSTANCE_ID}"
+                        echo "INSTANCE IP: ${INSTANCE_IP}"
                     }
                 }
             }
         }
 
+        /* Task 2: Dynamic Inventory */
         stage('Create Dynamic Inventory') {
             steps {
                 sh '''
-                echo "[splunk]" > dynamic_inventory.ini
+                echo "[ec2]" > dynamic_inventory.ini
                 echo "${INSTANCE_IP} ansible_user=ec2-user" >> dynamic_inventory.ini
                 '''
             }
         }
 
+        /* Task 3: AWS Health Check */
         stage('Wait for EC2 Health') {
             steps {
                 withCredentials([
@@ -61,49 +59,10 @@ pipeline {
                 }
             }
         }
-
-        stage('Wait for SSH') {
-            steps {
-                sh '''
-                for i in {1..10}; do
-                  nc -z ${INSTANCE_IP} 22 && exit 0
-                  echo "Waiting for SSH..."
-                  sleep 15
-                done
-                exit 1
-                '''
-            }
-        }
-
-        stage('Install Splunk') {
-            steps {
-                sshagent(['My_Ecommerce']) {
-                    sh '''
-                    ansible-playbook playbooks/splunk.yml \
-                      -i dynamic_inventory.ini \
-                      -u ec2-user \
-                      --ssh-extra-args="-o StrictHostKeyChecking=no"
-                    '''
-                }
-            }
-        }
-
-        stage('Verify Splunk') {
-            steps {
-                sshagent(['My_Ecommerce']) {
-                    sh '''
-                    ansible-playbook playbooks/test-splunk.yml \
-                      -i dynamic_inventory.ini \
-                      -u ec2-user \
-                      --ssh-extra-args="-o StrictHostKeyChecking=no"
-                    '''
-                }
-            }
-        }
-
+        /* Task 5: Destroy */
         stage('Validate Destroy') {
             steps {
-                input message: "Destroy infrastructure?", ok: "Destroy"
+                input message: 'Destroy infrastructure?', ok: 'Destroy'
             }
         }
 
@@ -122,14 +81,6 @@ pipeline {
     post {
         always {
             sh 'rm -f dynamic_inventory.ini'
-        }
-        failure {
-            withCredentials([
-                [$class: 'AmazonWebServicesCredentialsBinding',
-                 credentialsId: 'AWS_CREDS']
-            ]) {
-                sh "terraform destroy -auto-approve -var-file=${BRANCH_NAME}.tfvars || true"
-            }
         }
     }
 }
