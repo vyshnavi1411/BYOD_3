@@ -2,18 +2,18 @@ pipeline {
     agent any
 
     environment {
-        // Terraform settings
+        // Terraform
         TF_IN_AUTOMATION = 'true'
         TF_CLI_ARGS      = '-no-color'
 
-        // Ansible settings
+        // Disable SSH host key checking for automation
         ANSIBLE_HOST_KEY_CHECKING = 'False'
 
-        // Tooling paths
-        PATH = "/Users/vyshu/Library/Python/3.12/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-
-        // SSH credential ID (stored in Jenkins)
+        // SSH credential ID
         SSH_CRED_ID = 'My_SSH'
+
+        // Tool paths
+        PATH = "/Users/vyshu/Library/Python/3.12/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
     }
 
     stages {
@@ -25,7 +25,7 @@ pipeline {
             steps {
                 withCredentials([
                     [$class: 'AmazonWebServicesCredentialsBinding',
-                     credentialsId: 'My_AWS_Creds']
+                     credentialsId: 'AWS_CREDS']
                 ]) {
                     script {
                         sh "terraform init"
@@ -67,7 +67,7 @@ pipeline {
             steps {
                 withCredentials([
                     [$class: 'AmazonWebServicesCredentialsBinding',
-                     credentialsId: 'My_AWS_Creds']
+                     credentialsId: 'AWS_CREDS']
                 ]) {
                     sh '''
                     aws ec2 wait instance-status-ok \
@@ -86,7 +86,7 @@ pipeline {
                 sh '''
                 for i in {1..10}; do
                   nc -z ${INSTANCE_IP} 22 && exit 0
-                  echo "Waiting for SSH port to open..."
+                  echo "Waiting for SSH..."
                   sleep 15
                 done
                 exit 1
@@ -131,7 +131,7 @@ pipeline {
            ========================= */
         stage('Validate Destroy') {
             steps {
-                input message: "Infrastructure is ready. Approve to destroy?", ok: "Destroy"
+                input message: "Infrastructure ready. Destroy now?", ok: "Destroy"
             }
         }
 
@@ -142,7 +142,7 @@ pipeline {
             steps {
                 withCredentials([
                     [$class: 'AmazonWebServicesCredentialsBinding',
-                     credentialsId: 'My_AWS_Creds']
+                     credentialsId: 'AWS_CREDS']
                 ]) {
                     sh "terraform destroy -auto-approve -var-file=${BRANCH_NAME}.tfvars"
                 }
@@ -157,7 +157,7 @@ pipeline {
         failure {
             withCredentials([
                 [$class: 'AmazonWebServicesCredentialsBinding',
-                 credentialsId: 'My_AWS_Creds']
+                 credentialsId: 'AWS_CREDS']
             ]) {
                 sh "terraform destroy -auto-approve -var-file=${BRANCH_NAME}.tfvars || true"
             }
@@ -165,7 +165,7 @@ pipeline {
         aborted {
             withCredentials([
                 [$class: 'AmazonWebServicesCredentialsBinding',
-                 credentialsId: 'My_AWS_Creds']
+                 credentialsId: 'AWS_CREDS']
             ]) {
                 sh "terraform destroy -auto-approve -var-file=${BRANCH_NAME}.tfvars || true"
             }
