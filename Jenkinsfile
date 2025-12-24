@@ -6,7 +6,6 @@ pipeline {
         TF_CLI_ARGS      = '-no-color'
         ANSIBLE_HOST_KEY_CHECKING = 'False'
 
-        // PATH for terraform, aws, ansible
         PATH = "/Users/vyshu/Library/Python/3.12/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
     }
 
@@ -18,21 +17,23 @@ pipeline {
                     [$class: 'AmazonWebServicesCredentialsBinding',
                      credentialsId: 'AWS_CREDS']
                 ]) {
-                    sh "terraform init"
-                    sh "terraform apply -auto-approve -var-file=${BRANCH_NAME}.tfvars"
+                    script {
+                        sh "terraform init"
+                        sh "terraform apply -auto-approve -var-file=${BRANCH_NAME}.tfvars"
 
-                    env.INSTANCE_ID = sh(
-                        script: 'terraform output -raw instance_id',
-                        returnStdout: true
-                    ).trim()
+                        env.INSTANCE_ID = sh(
+                            script: 'terraform output -raw instance_id',
+                            returnStdout: true
+                        ).trim()
 
-                    env.INSTANCE_IP = sh(
-                        script: 'terraform output -raw instance_public_ip',
-                        returnStdout: true
-                    ).trim()
+                        env.INSTANCE_IP = sh(
+                            script: 'terraform output -raw instance_public_ip',
+                            returnStdout: true
+                        ).trim()
 
-                    echo "EC2 ID: ${env.INSTANCE_ID}"
-                    echo "EC2 IP: ${env.INSTANCE_IP}"
+                        echo "EC2 INSTANCE ID : ${env.INSTANCE_ID}"
+                        echo "EC2 PUBLIC IP  : ${env.INSTANCE_IP}"
+                    }
                 }
             }
         }
