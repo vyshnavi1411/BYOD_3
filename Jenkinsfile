@@ -117,14 +117,9 @@ pipeline {
        Post Actions (Cleanup)
        ========================= */
     post {
-        always {
-            sh 'rm -f dynamic_inventory.ini'
-        }
-        failure {
-            sh "terraform destroy -auto-approve -var-file=${BRANCH_NAME}.tfvars || true"
-        }
-        aborted {
-            sh "terraform destroy -auto-approve -var-file=${BRANCH_NAME}.tfvars || true"
-        }
+    always {
+        sh 'rm -f dynamic_inventory.ini'
     }
+}
+
 }
