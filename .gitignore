@@ -1,0 +1,9 @@
+# Terraform local files
+.terraform/
+*.tfstate
+*.tfstate.backup
+crash.log
+
+# Terraform CLI config
+.terraformrc
+terraform.rc
