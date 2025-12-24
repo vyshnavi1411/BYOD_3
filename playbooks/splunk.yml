@@ -2,6 +2,7 @@
 - name: Install and configure Splunk
   hosts: splunk
   become: yes
+  gather_facts: no
 
   tasks:
     - name: Download Splunk
