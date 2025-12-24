@@ -8,6 +8,9 @@ pipeline {
         AWS_CREDS   = credentials('AWS_CREDS')
         SSH_CRED_ID = 'My_SSH'
 
+        // 🔴 CRITICAL: disable SSH host key checking for Ansible
+        ANSIBLE_HOST_KEY_CHECKING = 'False'
+
         // Terraform + AWS CLI + Ansible paths
         PATH = "/Users/vyshu/Library/Python/3.12/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
     }
@@ -37,8 +40,8 @@ pipeline {
                         error "Invalid INSTANCE_ID captured: ${env.INSTANCE_ID}"
                     }
 
-                    echo "EC2 INSTANCE ID: ${env.INSTANCE_ID}"
-                    echo "EC2 PUBLIC IP : ${env.INSTANCE_IP}"
+                    echo "EC2 INSTANCE ID : ${env.INSTANCE_ID}"
+                    echo "EC2 PUBLIC IP  : ${env.INSTANCE_IP}"
                 }
             }
         }
@@ -50,7 +53,7 @@ pipeline {
             steps {
                 sh '''
                 echo "[splunk]" > dynamic_inventory.ini
-                echo "${INSTANCE_IP} ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/mykey.pem" >> dynamic_inventory.ini
+                echo "${INSTANCE_IP} ansible_user=ec2-user" >> dynamic_inventory.ini
                 '''
             }
         }
@@ -69,14 +72,14 @@ pipeline {
         }
 
         /* =========================
-           Wait for SSH (IMPORTANT)
+           Wait for SSH
            ========================= */
         stage('Wait for SSH') {
             steps {
                 sh '''
                 for i in {1..10}; do
                   nc -z ${INSTANCE_IP} 22 && exit 0
-                  echo "Waiting for SSH to be ready..."
+                  echo "Waiting for SSH..."
                   sleep 15
                 done
                 exit 1
@@ -100,17 +103,15 @@ pipeline {
         /* =========================
            Verify Splunk
            ========================= */
-       stage('Verify Splunk') {
-    steps {
-        sh '''
-        ansible-playbook playbooks/test-splunk.yml \
-          -i dynamic_inventory.ini \
-          -u ec2-user \
-          --ssh-extra-args='-o StrictHostKeyChecking=no'
-        '''
-    }
-}
-
+        stage('Verify Splunk') {
+            steps {
+                sh '''
+                ansible-playbook playbooks/test-splunk.yml \
+                  -i dynamic_inventory.ini \
+                  -u ec2-user
+                '''
+            }
+        }
 
         /* =========================
            Manual Destroy Approval
@@ -134,6 +135,12 @@ pipeline {
     post {
         always {
             sh 'rm -f dynamic_inventory.ini'
+        }
+        failure {
+            sh "terraform destroy -auto-approve -var-file=${BRANCH_NAME}.tfvars || true"
+        }
+        aborted {
+            sh "terraform destroy -auto-approve -var-file=${BRANCH_NAME}.tfvars || true"
         }
     }
 }
