@@ -2,17 +2,17 @@ pipeline {
     agent any
 
     environment {
-        // Terraform
+        // Terraform settings
         TF_IN_AUTOMATION = 'true'
         TF_CLI_ARGS      = '-no-color'
 
         // Disable SSH host key checking for automation
         ANSIBLE_HOST_KEY_CHECKING = 'False'
 
-        // SSH credential ID
-        SSH_CRED_ID = 'My_SSH'
+        // SSH credential ID (MUST match EC2 key pair)
+        SSH_CRED_ID = 'My_Ecommerce'
 
-        // Tool paths
+        // Tooling paths
         PATH = "/Users/vyshu/Library/Python/3.12/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
     }
 
