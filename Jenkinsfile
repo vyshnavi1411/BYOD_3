@@ -1,15 +1,16 @@
 pipeline {
     agent any
 
-    environment {
-        TF_IN_AUTOMATION = 'true'
-        TF_CLI_ARGS      = '-no-color'
+   environment {
+    TF_IN_AUTOMATION = 'true'
+    TF_CLI_ARGS      = '-no-color'
 
-        AWS_CREDS   = credentials('AWS_CREDS')
-        SSH_CRED_ID = 'My_SSH'
+    AWS_CREDS   = credentials('AWS_CREDS')
+    SSH_CRED_ID = 'My_SSH'
 
-        PATH = "/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-    }
+    PATH = "/Users/vyshu/Library/Python/3.12/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+}
+
 
     stages {
 
