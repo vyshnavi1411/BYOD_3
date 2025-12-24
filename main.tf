@@ -6,28 +6,42 @@ terraform {
     }
   }
 }
+
 provider "aws" {
   region = var.region
 }
+
+# ================= VARIABLES =================
+
 variable "region" {
-  description = "AWS region"
-  type        = string
+  type = string
 }
 
 variable "instance_type" {
-  description = "EC2 instance type"
-  type        = string
+  type = string
 }
 
 variable "environment" {
-  description = "Environment name"
-  type        = string
+  type = string
 }
+
+# ================= EC2 RESOURCE =================
+
 resource "aws_instance" "example" {
   ami           = "ami-0e001c9271cf7f3b9"   # Amazon Linux 2 (us-east-1)
   instance_type = var.instance_type
 
   tags = {
-    Name = "devshop-${var.environment}"
+    Name = "byod-${var.environment}"
   }
+}
+
+# ================= OUTPUTS (CRITICAL) =================
+
+output "instance_id" {
+  value = aws_instance.example.id
+}
+
+output "instance_public_ip" {
+  value = aws_instance.example.public_ip
 }

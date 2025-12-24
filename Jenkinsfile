@@ -4,34 +4,47 @@ pipeline {
     environment {
         TF_IN_AUTOMATION = 'true'
         TF_CLI_ARGS      = '-no-color'
+
         AWS_CREDS   = credentials('AWS_CREDS')
         SSH_CRED_ID = 'My_SSH'
+
         PATH = "/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
     }
 
     stages {
 
+        /* =========================
+           Terraform Apply + Outputs
+           ========================= */
         stage('Terraform Apply') {
             steps {
                 script {
+                    sh "terraform init"
                     sh "terraform apply -auto-approve -var-file=${BRANCH_NAME}.tfvars"
-
-                    env.INSTANCE_IP = sh(
-                        script: 'terraform output -raw instance_public_ip',
-                        returnStdout: true
-                    ).trim()
 
                     env.INSTANCE_ID = sh(
                         script: 'terraform output -raw instance_id',
                         returnStdout: true
                     ).trim()
 
-                    echo "EC2 IP: ${env.INSTANCE_IP}"
-                    echo "EC2 ID: ${env.INSTANCE_ID}"
+                    env.INSTANCE_IP = sh(
+                        script: 'terraform output -raw instance_public_ip',
+                        returnStdout: true
+                    ).trim()
+
+                    if (!env.INSTANCE_ID.startsWith("i-")) {
+                        error "Invalid INSTANCE_ID captured: ${env.INSTANCE_ID}"
+                    }
+
+                    echo "EC2 INSTANCE ID: ${env.INSTANCE_ID}"
+                    echo "EC2 PUBLIC IP : ${env.INSTANCE_IP}"
                 }
             }
         }
 
+        /* =========================
+           Dynamic Inventory
+           ========================= */
         stage('Create Dynamic Inventory') {
             steps {
                 sh '''
@@ -41,6 +54,9 @@ pipeline {
             }
         }
 
+        /* =========================
+           AWS Health Check
+           ========================= */
         stage('Wait for EC2 Health') {
             steps {
                 sh '''
@@ -51,6 +67,9 @@ pipeline {
             }
         }
 
+        /* =========================
+           Install Splunk
+           ========================= */
         stage('Install Splunk') {
             steps {
                 ansiblePlaybook(
@@ -61,6 +80,9 @@ pipeline {
             }
         }
 
+        /* =========================
+           Test Splunk
+           ========================= */
         stage('Test Splunk') {
             steps {
                 ansiblePlaybook(
@@ -71,12 +93,18 @@ pipeline {
             }
         }
 
+        /* =========================
+           Manual Destroy Gate
+           ========================= */
         stage('Validate Destroy') {
             steps {
                 input message: 'Do you want to destroy the infrastructure?', ok: 'Destroy'
             }
         }
 
+        /* =========================
+           Terraform Destroy
+           ========================= */
         stage('Terraform Destroy') {
             steps {
                 sh "terraform destroy -auto-approve -var-file=${BRANCH_NAME}.tfvars"
