@@ -30,7 +30,7 @@ variable "environment" {
 resource "aws_instance" "example" {
   ami           = "ami-0e001c9271cf7f3b9"   # Amazon Linux 2 (us-east-1)
   instance_type = var.instance_type
-  key_name = "My_ECommerce"
+  key_name = "My_Ecommerce"
   tags = {
     Name = "byod-${var.environment}"
   }
