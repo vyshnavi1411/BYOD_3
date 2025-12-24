@@ -100,15 +100,17 @@ pipeline {
         /* =========================
            Verify Splunk
            ========================= */
-        stage('Verify Splunk') {
-            steps {
-                sh '''
-                ansible-playbook playbooks/test-splunk.yml \
-                  -i dynamic_inventory.ini \
-                  -u ec2-user
-                '''
-            }
-        }
+       stage('Verify Splunk') {
+    steps {
+        sh '''
+        ansible-playbook playbooks/test-splunk.yml \
+          -i dynamic_inventory.ini \
+          -u ec2-user \
+          --ssh-extra-args='-o StrictHostKeyChecking=no'
+        '''
+    }
+}
+
 
         /* =========================
            Manual Destroy Approval
