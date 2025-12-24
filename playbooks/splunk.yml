@@ -1,0 +1,18 @@
+---
+- name: Install and configure Splunk
+  hosts: splunk
+  become: yes
+
+  tasks:
+    - name: Download Splunk
+      get_url:
+        url: https://download.splunk.com/products/splunk/releases/9.1.2/linux/splunk-9.1.2-1a6cc8da4bf0-linux-2.6-x86_64.rpm
+        dest: /tmp/splunk.rpm
+
+    - name: Install Splunk
+      yum:
+        name: /tmp/splunk.rpm
+        state: present
+
+    - name: Start Splunk and accept license
+      command: /opt/splunk/bin/splunk start --accept-license --answer-yes --no-prompt
